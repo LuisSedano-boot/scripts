@@ -41,6 +41,13 @@ if [ $? -eq 0 ]; then
     mkdir -p "$carpeta_cifrada"
     mkdir -p "$carpeta_montada"
 
+    # Verificar si ya está montado
+    if mountpoint -q "$carpeta_montada"; then
+        echo "⚠️ Volumen ya estaba montado. Desmontando..."
+        fusermount -u "$carpeta_montada"
+        sleep 1
+    fi
+
     # Montar sistema cifrado
     echo "🔑 Montando volumen cifrado..."
     gocryptfs -passfile "$archivo_pass" "$carpeta_cifrada" "$carpeta_montada"
@@ -49,9 +56,21 @@ if [ $? -eq 0 ]; then
         echo "📁 Copiando respaldo cifrado..."
         cp "$archivo_sql" "$carpeta_montada/"
         cp "$archivo_md5" "$carpeta_montada/"
-        
-        # Desmontar volumen
-        fusermount -u "$carpeta_montada"
+
+        # === Desmontar volumen de forma segura ===
+        echo "📤 Intentando desmontar volumen cifrado..."
+
+        while mountpoint -q "$carpeta_montada"; do
+            fusermount -u "$carpeta_montada"
+            sleep 1
+        done
+
+        if ! mountpoint -q "$carpeta_montada"; then
+            echo "✅ Volumen desmontado correctamente."
+        else
+            echo "❌ No se pudo desmontar el volumen. Revisa si está en uso o bloqueado."
+        fi
+
         echo "✅ Respaldo cifrado y desmontado correctamente."
     else
         echo "❌ Error al montar volumen cifrado. Verifica la contraseña o ruta."
